@@ -96,15 +96,14 @@ jobs:
 
 
     - name: Prepare APK
-
       run: |
+       mkdir -p output
 
-        mkdir -p output
+       APK=$(find . -type f -name "*.apk" | head -n 1)
 
+       echo "APK=$APK"
 
-        cp \
-        TMessagesProj/build/outputs/apk/afat/release/app.apk \
-        output/Telegram-arm64-play-no-r8.apk
+       cp "$APK" output/Telegram-arm64-play-no-r8.apk
 
 
 
