@@ -1,0 +1,76 @@
+name: Build Telegram arm64 APK
+
+on:
+  workflow_dispatch: # 支持手动触发
+  push:
+    branches:
+      - master
+      - dev
+      - release*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Telegram 源码包含子模块，必须递归拉取
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK, CMake and Build Tools
+        run: |
+          # 根据 Telegram 官方 BUILDING.md 要求安装对应的 NDK 与 CMake 版本
+          sdkmanager --install "ndk;27.2.12479018" "cmake;3.22.1" "build-tools;36.0.0" "platforms;android-36"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
+
+      - name: Set Gradle JVM Args
+        run: |
+          # 调大 Gradle 内存防止编译 OOM
+          echo "org.gradle.jvmargs=-Xmx6g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+
+      - name: Force arm64-v8a Only (Restrict ABIs)
+        run: |
+          # 通过 Python 脚本向 TMessagesProj/build.gradle 的 defaultConfig 注入 abiFilters，只保留 arm64-v8a
+          python3 -c '
+          import re
+          file_path = "TMessagesProj/build.gradle"
+          with open(file_path, "r", encoding="utf-8") as f:
+              content = f.read()
+
+          # 寻找 defaultConfig 块并在其中插入 ndk 过滤
+          target = "defaultConfig {"
+          replacement = "defaultConfig {\n        ndk {\n            abiFilters \"arm64-v8a\"\n        }"
+          
+          if target in content:
+              content = content.replace(target, replacement, 1)
+              with open(file_path, "w", encoding="utf-8") as f:
+                  f.write(content)
+              print("Successfully injected arm64-v8a abiFilters!")
+          else:
+              raise Exception("Could not find defaultConfig in build.gradle")
+          '
+
+      - name: Build Telegram arm64 APK (Google Play / Afat Variant)
+        run: |
+          chmod +x gradlew
+          # 直接编译（使用官方仓库自带的默认 Keystore 和 BuildVars 凭据）
+          ./gradlew assembleAfatRelease --stacktrace
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telegram-arm64-GooglePlay-APK
+          path: |
+            TMessagesProj/build/outputs/apk/**/*.apk
+            TMessagesProj/build/outputs/bundle/**/*.aab
+          retention-days: 7
