@@ -1,9 +1,11 @@
-name: Build Telegram ARM64 Play no R8
+name: Build Telegram ARM64 Play No R8
 
 on:
   workflow_dispatch:
 
+
 jobs:
+
   build:
 
     runs-on: ubuntu-latest
@@ -13,6 +15,7 @@ jobs:
 
 
     steps:
+
 
     - name: Checkout
       uses: actions/checkout@v4
@@ -28,41 +31,52 @@ jobs:
 
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
+      with:
+        packages: ''
 
 
     - name: Install Android SDK
       run: |
+
+        yes | sdkmanager --licenses
+
         sdkmanager \
-        "platforms;android-36" \
-        "build-tools;36.0.0" \
-        "ndk;27.2.12479018"
+          "platforms;android-35" \
+          "build-tools;35.0.0" \
+          "ndk;25.2.9519653"
 
 
-    - name: Gradle cache
+    - name: Gradle Cache
       uses: actions/cache@v4
       with:
+
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
+
         key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
 
 
-    # 临时修改，不提交
-    - name: Disable R8 and shrink
+    # 临时关闭混淆，不提交源码
+    - name: Disable R8
+
       run: |
 
         sed -i \
         's/minifyEnabled true/minifyEnabled false/g' \
         TMessagesProj_App/build.gradle
 
+
         sed -i \
         's/shrinkResources true/shrinkResources false/g' \
         TMessagesProj_App/build.gradle
 
 
-    # 只编译 arm64
-    - name: ARM64 only
+
+    # 只编译 arm64-v8a
+    - name: Set ARM64 ABI
+
       run: |
 
         sed -i \
@@ -70,7 +84,9 @@ jobs:
         TMessagesProj_App/build.gradle
 
 
+
     - name: Build Telegram Play APK
+
       run: |
 
         ./gradlew \
@@ -78,18 +94,26 @@ jobs:
         --no-daemon
 
 
-    - name: Collect APK
+
+    - name: Prepare APK
+
       run: |
 
-        mkdir output
+        mkdir -p output
+
 
         cp \
         TMessagesProj/build/outputs/apk/afat/release/app.apk \
         output/Telegram-arm64-play-no-r8.apk
 
 
+
     - name: Upload APK
+
       uses: actions/upload-artifact@v4
+
       with:
+
         name: Telegram-arm64-play-no-r8
+
         path: output/*.apk
