@@ -94,25 +94,35 @@ jobs:
         --no-daemon
 
 
+    - name: Read version
+      id: version
+      run: |
+       APK=TMessagesProj_App/build/outputs/apk/afat/release/app.apk
 
-    - name: Prepare APK
+       sudo apt-get update
+       sudo apt-get install -y aapt
+
+       VERSION_NAME=$(aapt dump badging "$APK" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+       VERSION_CODE=$(aapt dump badging "$APK" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+
+       echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+       echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+
+    - name: Rename APK
       run: |
        mkdir -p output
 
-       APK=$(find . -type f -name "*.apk" | head -n 1)
+       cp \
+       TMessagesProj_App/build/outputs/apk/afat/release/app.apk \
+       "output/Telegram-v${{ steps.version.outputs.version_name }}(${{ steps.version.outputs.version_code }})-arm64-play-no-r8.apk"
 
-       echo "APK=$APK"
-
-       cp "$APK" output/Telegram-arm64-play-no-r8.apk
-
-
-
-    - name: Upload APK
-
-      uses: actions/upload-artifact@v4
-
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
       with:
-
-        name: Telegram-arm64-play-no-r8
-
-        path: output/*.apk
+       tag_name: v${{ steps.version.outputs.version_name }}
+       name: Telegram v${{ steps.version.outputs.version_name }}
+       generate_release_notes: true
+       files: output/*.apk
+      env:
+       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
