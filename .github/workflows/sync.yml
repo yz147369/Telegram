@@ -1,0 +1,43 @@
+name: Sync Upstream Telegram
+
+on:
+  schedule:
+    # 北京时间每天 08:00 和 20:00
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
+
+  workflow_dispatch:
+
+
+jobs:
+  sync:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+
+    - name: Sync upstream
+      run: |
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        git remote add upstream https://github.com/DrKLO/Telegram.git || true
+
+        git fetch upstream
+
+        git checkout master
+
+        git rebase upstream/master
+
+        git push origin master --force
